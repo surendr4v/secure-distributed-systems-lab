@@ -1,73 +1,76 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="200" alt="Nest Logo" /></a>
-</p>
+# Secure Distributed Systems Lab
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This repository has been repurposed from a starter template into a **hands-on lab for secure distributed systems** with NestJS.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+## Mission
 
-## Description
+Design, build, and harden backend services that communicate across boundaries safely and reliably.
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The lab starts with a reservations domain and evolves through incremental, testable improvements in:
 
-## Installation
+- security controls,
+- distributed-systems correctness,
+- and production readiness.
 
-```bash
-$ pnpm install
-```
+## Current repository scope
 
-## Running the app
+- `apps/reservations`: reservations service (API layer, domain service, DTOs, repository usage).
+- `libs/common`: shared building blocks for config and database abstractions.
 
-```bash
-# development
-$ pnpm run start
+## Lab operating principles
 
-# watch mode
-$ pnpm run start:dev
+Each PR should improve at least one of these dimensions:
 
-# production mode
-$ pnpm run start:prod
-```
+1. **Security posture**
+   - strict input validation and sanitization,
+   - explicit authn/authz boundaries,
+   - secret/config hygiene,
+   - least-privilege data access patterns.
+2. **Distributed behavior**
+   - idempotent write workflows,
+   - retry-safe operations and timeout handling,
+   - consistency-aware failure-mode design.
+3. **Operability**
+   - structured logging and correlation IDs,
+   - health/readiness checks,
+   - clear runbooks and predictable local dev flow.
+4. **Maintainability**
+   - strong module boundaries,
+   - reusable shared libraries with low coupling,
+   - meaningful unit/e2e coverage.
 
-## Test
+## Development workflow
 
 ```bash
-# unit tests
-$ pnpm run test
+# install dependencies
+pnpm install
 
-# e2e tests
-$ pnpm run test:e2e
+# run the app in watch mode
+pnpm run start:dev
 
-# test coverage
-$ pnpm run test:cov
+# run unit tests
+pnpm run test
+
+# run e2e tests
+pnpm run test:e2e
+
+# lint and auto-fix
+pnpm run lint
 ```
 
-## Support
+## Near-term roadmap
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+- Add authentication and authorization middleware/guards for mutating endpoints.
+- Introduce request-scoped correlation IDs and structured logs.
+- Add resilience controls (timeouts, retries, fallback behavior) for downstream failures.
+- Expand e2e coverage for security and consistency edge cases.
+- Document threat model assumptions and non-goals in `/docs`.
 
-## Stay in touch
+## Definition of done for lab changes
 
-- Author - [Kamil Myśliwiec](https://kamilmysliwiec.com)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+A change is considered complete when it includes:
 
-## License
-
-Nest is [MIT licensed](LICENSE).
+- clear intent tied to at least one lab principle,
+- automated tests (or documented reason if not feasible),
+- operational considerations (logging/errors/config),
+- and concise documentation updates when behavior changes.
