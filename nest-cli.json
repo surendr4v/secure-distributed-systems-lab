@@ -16,6 +16,16 @@
       "compilerOptions": {
         "tsConfigPath": "apps/transactions/tsconfig.app.json"
       }
+    },
+
+    "reservations": {
+      "type": "application",
+      "root": "apps/reservations",
+      "entryFile": "main",
+      "sourceRoot": "apps/reservations/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/reservations/tsconfig.app.json"
+      }
     }
   },
   "monorepo": true,
