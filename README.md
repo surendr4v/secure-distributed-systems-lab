@@ -1,76 +1,121 @@
-# Secure Distributed Systems Lab
+# Secure Financial Transaction Microservice (v0.1.0)
 
-This repository has been repurposed from a starter template into a **hands-on lab for secure distributed systems** with NestJS.
+This repository is a **mini technical whitepaper + reference implementation** for a security-first financial microservice built with NestJS. It demonstrates how to compose zero-trust controls, auditable workflows, and production-ready scaffolding in a compact codebase.
 
-## Mission
+## Problem Statement
+Financial transaction systems must process sensitive money flows while resisting credential theft, insider misuse, replay attempts, and supply-chain risk. We need a baseline blueprint that shows how to wire authentication, authorization, auditability, and operational safety into every hop.
 
-Design, build, and harden backend services that communicate across boundaries safely and reliably.
+## Why Secure Distributed Systems Matter
+- Lateral movement is the norm in microservice architectures; implicit trust between services becomes an attack surface.
+- Regulatory expectations (SOX, PCI DSS, SOC2) demand traceable controls around identity, integrity, and availability.
+- Downtime or double-spend bugs carry real financial loss and reputational damage.
 
-The lab starts with a reservations domain and evolves through incremental, testable improvements in:
+## Financial Systems Use Case
+- Accept payment instructions, enforce roles, and emit immutable audit records.
+- Support service-to-service calls from risk engines, fraud detectors, and ledgers via zero-trust mesh tokens.
+- Provide hooks for persistence, eventing, and compliance evidence.
 
-- security controls,
-- distributed-systems correctness,
-- and production readiness.
+## Security Architecture Principles
+- **Deny-by-default**: every route is protected unless explicitly marked `@Public()`.
+- **Identity everywhere**: JWT for users, shared-secret or mTLS for services.
+- **Least privilege**: RBAC on controllers; mesh identities bypass only role checks when explicitly service-scope.
+- **Verifiable state**: audit trail on every request result (success/failure).
+- **Secure-by-config**: strict env validation; app refuses to boot with incomplete secrets.
 
-## Current repository scope
+## Zero-Trust Implementation
+- Global guard enforces either OAuth2 JWT (RS/ES/PS256) or `x-service-token` for mesh calls.
+- Optional mTLS listener when `TLS_CERT_PATH`/`TLS_KEY_PATH` are provided.
+- Global Helmet + validation pipe to reduce surface for common exploits.
 
-- `apps/reservations`: reservations service (API layer, domain service, DTOs, repository usage).
-- `libs/common`: shared building blocks for config and database abstractions.
+## Audit Logging
+- `AuditInterceptor` writes JSON lines to `logs/audit.log` with actor, action, resource, status, roles, IP, and trace id.
+- Works on both success and error paths for forensic completeness.
 
-## Lab operating principles
+## OAuth2 / RBAC
+- JWT validation pinned to `iss` and `aud` from config.
+- Roles decorator (`@Roles(...)`) and guard enforce fine-grained access (`payments:write`, `payments:read`).
 
-Each PR should improve at least one of these dimensions:
+## Compliance Considerations
+- Boot-time config validation ensures secrets are present (reduces misconfig drift).
+- Structured audit log supports PCI/SOX evidence; extend to remote log sinks for immutability.
+- mTLS + JWT layered auth aligns with least privilege and segregation-of-duties.
 
-1. **Security posture**
-   - strict input validation and sanitization,
-   - explicit authn/authz boundaries,
-   - secret/config hygiene,
-   - least-privilege data access patterns.
-2. **Distributed behavior**
-   - idempotent write workflows,
-   - retry-safe operations and timeout handling,
-   - consistency-aware failure-mode design.
-3. **Operability**
-   - structured logging and correlation IDs,
-   - health/readiness checks,
-   - clear runbooks and predictable local dev flow.
-4. **Maintainability**
-   - strong module boundaries,
-   - reusable shared libraries with low coupling,
-   - meaningful unit/e2e coverage.
+## Scalability & Resilience Design
+- Stateless app; ready for horizontal scaling behind a gateway or service mesh.
+- In-memory ledger stub is replaceable with ACID/append-only store plus idempotency keys.
+- Hooks for circuit breakers, retries, and outbox/event streaming for eventual consistency.
 
-## Development workflow
+## Architecture (Conceptual)
 
-```bash
-# install dependencies
-pnpm install
-
-# run the app in watch mode
-pnpm run start:dev
-
-# run unit tests
-pnpm run test
-
-# run e2e tests
-pnpm run test:e2e
-
-# lint and auto-fix
-pnpm run lint
+```mermaid
+flowchart LR
+  Client -->|TLS + OAuth2| API[API Gateway]
+  API -->|JWT + mTLS| TX[Transactions Service]
+  API -->|JWT + mTLS| RSV[Reservation Service]
+  TX -->|events| MQ[(Message Broker)]
+  RSV -->|events| MQ
+  TX -->|SQL/NoSQL| DB[(Database)]
+  TX --> LOG[Structured Logging]
+  TX --> OBS[Observability Stack]
+  API --> AUTH[Auth Server]
+  AUTH --> API
 ```
 
-## Near-term roadmap
+**Threat Model**
+- Adversaries may intercept traffic, reuse stolen tokens, replay requests, or laterally move across services.
+- Controls: TLS everywhere, optional mTLS, JWT signature/claims validation, strict role checks, audit trail, and input validation.
 
-- Add authentication and authorization middleware/guards for mutating endpoints.
-- Introduce request-scoped correlation IDs and structured logs.
-- Add resilience controls (timeouts, retries, fallback behavior) for downstream failures.
-- Expand e2e coverage for security and consistency edge cases.
-- Document threat model assumptions and non-goals in `/docs`.
+**Security Controls**
+- Zero-trust guard for every route; public endpoints explicitly marked.
+- JWT verification (issuer/audience/algorithms), shared-secret mesh token, optional mTLS termination.
+- RBAC, Helmet, validation pipe, and structured audit logs.
 
-## Definition of done for lab changes
+**Failure Handling**
+- Config fails closed (missing secrets => boot abort).
+- Per-request validation errors return 400 before business logic.
+- Audit interceptor logs both success and failure for investigation.
+- Designed to add circuit breakers/timeouts when downstreams are wired.
 
-A change is considered complete when it includes:
+## Security Features (current)
+- Mutual TLS: supported when cert/key paths provided.
+- JWT validation: RS/ES/PS256, issuer + audience pinned.
+- Role-based authorization: controller-level `@Roles`.
+- Rate limiting: **TODO** (install nest rate-limiter or gateway policy).
+- Input validation: class-validator DTOs + global `ValidationPipe`.
+- Event-driven integrity checks: **TODO** (wire broker + idempotent handlers).
+- Idempotency patterns: **TODO** (idempotency keys + dedupe store).
+- Circuit breaker: **TODO** (e.g., opossum or mesh policy).
 
-- clear intent tied to at least one lab principle,
-- automated tests (or documented reason if not feasible),
-- operational considerations (logging/errors/config),
-- and concise documentation updates when behavior changes.
+## Key Endpoints
+- `GET /api/health` (public)
+- `GET /api/test` (public)
+- `POST /api/transactions` (roles: `payments:write`)
+- `GET /api/transactions/:id` (roles: `payments:read`)
+
+Service-to-service calls: `x-service-token: <SERVICE_MESH_SHARED_SECRET>` plus optional `x-service-name`.
+
+## Run Locally
+```bash
+pnpm install
+cp .env.example .env   # fill in JWT_PUBLIC_KEY + secrets
+pnpm run start:dev
+```
+Base path: `http://localhost:3000/api`
+
+## Container Image
+```bash
+docker build -t secure-tx .
+docker run -p 3000:3000 --env-file .env secure-tx
+```
+Provide `TLS_CERT_PATH` and `TLS_KEY_PATH` inside the container for mTLS listener.
+
+## Topics
+distributed-systems · microservices · zero-trust · fintech-architecture · secure-backend · typescript · kubernetes-ready
+
+## Release Notes
+See `RELEASE_NOTES.md` for version history (current: v0.1.0).
+
+## Next Steps
+- Add persistence (Mongo/Postgres) with idempotency keys.
+- Wire distributed tracing (OpenTelemetry) and metrics.
+- Add e2e security tests, contract tests for mesh calls, and rate limiting.
