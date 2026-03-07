@@ -17,6 +17,15 @@
         "tsConfigPath": "apps/transactions/tsconfig.app.json"
       }
     },
+    "gateway": {
+      "type": "application",
+      "root": "apps/gateway",
+      "entryFile": "main",
+      "sourceRoot": "apps/gateway/src",
+      "compilerOptions": {
+        "tsConfigPath": "apps/gateway/tsconfig.app.json"
+      }
+    },
 
     "reservations": {
       "type": "application",
