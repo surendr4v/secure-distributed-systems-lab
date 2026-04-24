@@ -1,0 +1,81 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: secure_finance
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  migrate:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./:/app
+    env_file:
+      - .env
+    command: sh -c "npm i -g pnpm && pnpm install && pnpm migrate && pnpm seed"
+    depends_on:
+      - postgres
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      PORT: 3001
+      SERVICE_NAME: auth-service
+    depends_on:
+      - postgres
+      - migrate
+
+  transaction-service:
+    build:
+      context: .
+      dockerfile: apps/transaction-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      PORT: 3002
+      SERVICE_NAME: transaction-service
+    depends_on:
+      - postgres
+      - migrate
+      - audit-service
+
+  audit-service:
+    build:
+      context: .
+      dockerfile: apps/audit-service/Dockerfile
+    env_file:
+      - .env
+    environment:
+      PORT: 3003
+      SERVICE_NAME: audit-service
+    depends_on:
+      - postgres
+      - migrate
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    env_file:
+      - .env
+    environment:
+      PORT: 3000
+      SERVICE_NAME: api-gateway
+    ports:
+      - '3000:3000'
+    depends_on:
+      - auth-service
+      - transaction-service
+
+volumes:
+  pgdata:
