@@ -80,7 +80,7 @@ flowchart LR
 - Mutual TLS: supported when cert/key paths provided.
 - JWT validation: RS/ES/PS256, issuer + audience pinned.
 - Role-based authorization: controller-level `@Roles`.
-- Rate limiting: **TODO** (install nest rate-limiter or gateway policy).
+- Rate limiting: per-client request quota via `@nestjs/throttler` (global `ThrottlerGuard`), configurable through `THROTTLE_TTL` / `THROTTLE_LIMIT`.
 - Input validation: class-validator DTOs + global `ValidationPipe`.
 - Event-driven integrity checks: **TODO** (wire broker + idempotent handlers).
 - Idempotency patterns: **TODO** (idempotency keys + dedupe store).
