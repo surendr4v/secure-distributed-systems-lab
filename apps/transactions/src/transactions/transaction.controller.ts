@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Post, Req } from '@nestjs/common';
 import { Roles } from '../security/roles.decorator';
 import { CreateTransactionDto } from './dto';
 import { TransactionRecord, TransactionService } from './transaction.service';
@@ -21,6 +21,9 @@ export class TransactionController {
   @Roles('payments:read')
   getOne(@Param('id') id: string): TransactionRecord {
     const record = this.service.findOne(id);
+    if (!record) {
+      throw new NotFoundException(`Transaction ${id} not found`);
+    }
     return record;
   }
 }
