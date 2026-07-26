@@ -24,7 +24,7 @@ export class SecurityService {
     this.publicKey = this.config.getOrThrow<string>('JWT_PUBLIC_KEY');
     this.issuer = this.config.getOrThrow<string>('JWT_ISSUER');
     this.audience = this.config.getOrThrow<string>('JWT_AUDIENCE');
-    this.meshSecret = this.config.getOrThrow<string>('SERVICE_MESH_SHARED_SECRET');
+    this.meshSecret = this.config.getOrThrow<string>('INTERNAL_SHARED_SECRET');
   }
 
   verifyJwt(token: string): AuthenticatedPrincipal {

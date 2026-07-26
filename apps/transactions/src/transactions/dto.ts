@@ -3,20 +3,20 @@ import { IsISO4217CurrencyCode, IsNotEmpty, IsNumber, IsPositive, IsString, Leng
 export class CreateTransactionDto {
   @IsNotEmpty()
   @IsString()
-  fromAccount: string;
+  fromAccount!: string;
 
   @IsNotEmpty()
   @IsString()
-  toAccount: string;
+  toAccount!: string;
 
   @IsNumber()
   @IsPositive()
-  amount: number;
+  amount!: number;
 
   @IsISO4217CurrencyCode()
-  currency: string;
+  currency!: string;
 
   @Length(1, 140)
   @IsString()
-  purpose: string;
+  purpose!: string;
 }
