@@ -4,8 +4,11 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build auth-service && nest build transaction-service && nest build audit-service && nest build api-gateway",
-    "start": "nest start transaction-service",
+    "build": "run-p build:*",
+    "build:auth": "nest build auth-service",
+    "build:tx": "nest build transaction-service",
+    "build:audit": "nest build audit-service",
+    "build:gateway": "nest build api-gateway",    "start": "nest start transaction-service",
     "start:dev": "nest start transaction-service --watch",
     "start:auth": "nest start auth-service --watch",
     "start:tx": "nest start transaction-service --watch",
