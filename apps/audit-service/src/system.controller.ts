@@ -1,14 +1,11 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { DatabaseService, Public, metricsRegistry } from '@shared/index';
+import { Public, metricsRegistry } from '@shared/index';
 import { Response } from 'express';
 
 @Controller()
 export class SystemController {
-  constructor(
-    private readonly config: ConfigService,
-    private readonly db: DatabaseService,
-  ) {}
+  constructor(private readonly config: ConfigService) {}
 
   @Public()
   @Get('health')
@@ -30,16 +27,13 @@ export class SystemController {
   @Public()
   @Get('ready')
   async ready(@Res() res: Response): Promise<void> {
-    const dbOk = await this.checkDb();
-    const status = dbOk ? 200 : 503;
-    res.status(status).json({
-      service: this.config.get<string>('SERVICE_NAME', 'audit-service'),
-      status: dbOk ? 'ready' : 'unavailable',
-      timestamp: new Date().toISOString(),
-    });
+  const dbOk = await this.checkDb(); 
+  const status = dbOk ? 200 : 503;
+  res.status(status).json({
+    service: this.config.get<string>('SERVICE_NAME', 'audit-service'),
+    status: dbOk ? 'ready' : 'unavailable',
+    timestamp: new Date().toISOString(),
+  });
   }
-
-  private async checkDb(): Promise<boolean> {
-    return this.db.checkConnection();
-  }
+  
 }

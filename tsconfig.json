@@ -21,12 +21,7 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "paths": {
-      "@shared": [
-        "libs/shared/src/index.ts"
-      ],
-      "@shared/*": [
-        "libs/shared/src/*"
-      ]
+      "@shared/*": ["libs/shared/src/*"]
     }
   }
 }
