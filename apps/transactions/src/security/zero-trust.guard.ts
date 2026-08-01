@@ -36,7 +36,7 @@ export class ZeroTrustGuard implements CanActivate {
       return true;
     }
 
-    const serviceToken = request.headers['x-service-token'] as string;
+    const serviceToken = request.headers['x-service-secret'] as string;
     if (this.security.validateServiceToken(serviceToken)) {
       (request as any).servicePrincipal = {
         service: request.headers['x-service-name'] || 'unknown',
@@ -45,7 +45,7 @@ export class ZeroTrustGuard implements CanActivate {
     }
 
     throw new UnauthorizedException(
-      'Missing or invalid credentials (Bearer JWT or x-service-token)',
+      'Missing or invalid credentials (Bearer JWT or x-service-secret)',
     );
   }
 }

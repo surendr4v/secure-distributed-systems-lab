@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { CreateTransactionDto, UpdateTransactionStatusDto } from './dto';
 import { TransactionRepository } from './transaction.repository';
@@ -8,6 +8,8 @@ import { TransactionRecord } from './types';
 export class TransactionService {
   private readonly auditUrl: string;
   private readonly sharedSecret: string;
+
+  private readonly logger = new Logger(TransactionService.name);
 
   constructor(private readonly repository: TransactionRepository, config: ConfigService) {
     this.auditUrl = config.get<string>('AUDIT_SERVICE_URL', 'http://audit-service:3003');
@@ -49,7 +51,7 @@ export class TransactionService {
 
   private async emitAudit(eventType: string, actor: string, resource: string, payload: Record<string, unknown>): Promise<void> {
     try {
-      await fetch(`${this.auditUrl}/api/audit-events`, {
+      const response = await fetch(`${this.auditUrl}/api/audit-events`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -58,8 +60,14 @@ export class TransactionService {
         },
         body: JSON.stringify({ eventType, actor, resource, payload }),
       });
-    } catch {
+
+      if (!response.ok) {
+        const body = await response.text();
+        this.logger.warn(`Audit failed: ${response.status}: ${body}`);
+      }
+    } catch (error) {
       // Intentionally swallow to avoid breaking primary flow when audit sink is unavailable.
+      this.logger.error('Audit emission failed', error instanceof Error ? error.stack : undefined);
     }
   }
 }

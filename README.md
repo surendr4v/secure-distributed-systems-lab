@@ -23,7 +23,7 @@ Financial transaction systems must process sensitive money flows while resisting
 - **Secure-by-config**: strict env validation; app refuses to boot with incomplete secrets.
 
 ## Zero-Trust Implementation
-- Global guard enforces either OAuth2 JWT (RS/ES/PS256) or `x-service-token` for mesh calls.
+- Global guard enforces either OAuth2 JWT (RS/ES/PS256) or `x-service-secret` for mesh calls.
 - Optional mTLS listener when `TLS_CERT_PATH`/`TLS_KEY_PATH` are provided.
 - Global Helmet + validation pipe to reduce surface for common exploits.
 
@@ -80,7 +80,7 @@ flowchart LR
 - Mutual TLS: supported when cert/key paths provided.
 - JWT validation: RS/ES/PS256, issuer + audience pinned.
 - Role-based authorization: controller-level `@Roles`.
-- Rate limiting: **TODO** (install nest rate-limiter or gateway policy).
+- Rate limiting: per-client request quota via `@nestjs/throttler` (global `ThrottlerGuard`), configurable through `THROTTLE_TTL` / `THROTTLE_LIMIT`.
 - Input validation: class-validator DTOs + global `ValidationPipe`.
 - Event-driven integrity checks: **TODO** (wire broker + idempotent handlers).
 - Idempotency patterns: **TODO** (idempotency keys + dedupe store).
@@ -92,7 +92,7 @@ flowchart LR
 - `POST /api/transactions` (roles: `payments:write`)
 - `GET /api/transactions/:id` (roles: `payments:read`)
 
-Service-to-service calls: `x-service-token: <SERVICE_MESH_SHARED_SECRET>` plus optional `x-service-name`.
+Service-to-service calls: `x-service-secret: <INTERNAL_SHARED_SECRET>` plus optional `x-service-name`.
 
 ## Run Locally
 ```bash
