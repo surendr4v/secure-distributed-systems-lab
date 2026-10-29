@@ -9,11 +9,17 @@ export class SystemController {
 
   @Public()
   @Get('health')
-  health(): { service: string; status: string; timestamp: string } {
+  health(): {
+    service: string;
+    status: string;
+    timestamp: string;
+    environment: string;
+  } {
     return {
       service: this.config.get<string>('SERVICE_NAME', 'auth-service'),
       status: 'ok',
       timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
     };
   }
 
