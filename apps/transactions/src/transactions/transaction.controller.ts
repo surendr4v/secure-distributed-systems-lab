@@ -6,9 +6,10 @@ import {
   Param,
   Post,
   Req,
+  BadRequestException,
 } from '@nestjs/common';
 import { Roles } from '../security/roles.decorator';
-import { CreateTransactionDto } from './dto';
+import { ApproveTransactionDto, CreateTransactionDto } from './dto';
 import { TransactionRecord, TransactionService } from './transaction.service';
 
 @Controller('transactions')
@@ -35,7 +36,42 @@ export class TransactionController {
       return existing;
     }
 
-    return this.service.submit(body, traceId, idempotencyKey);
+    const actor =
+      req.user?.sub || req.user?.email || req.servicePrincipal?.service;
+    return this.service.submit(body, traceId, idempotencyKey, actor);
+  }
+
+  @Post(':id/approve')
+  @Roles('payments:approve')
+  approve(
+    @Param('id') id: string,
+    @Body() body: ApproveTransactionDto,
+    @Req() req: any,
+  ): TransactionRecord {
+    const record = this.service.findOne(id);
+    if (!record) {
+      throw new NotFoundException(`Transaction ${id} not found`);
+    }
+
+    const approverId =
+      body.approverId || req.user?.sub || req.servicePrincipal?.service;
+
+    try {
+      const approved = this.service.approve(id, {
+        ...body,
+        approverId,
+      });
+
+      if (!approved) {
+        throw new NotFoundException(`Transaction ${id} not found`);
+      }
+
+      return approved;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'Approval failed';
+      throw new BadRequestException(message);
+    }
   }
 
   @Get(':id')
