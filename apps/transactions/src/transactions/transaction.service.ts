@@ -17,6 +17,9 @@ export interface TransactionRecord {
 
 @Injectable()
 export class TransactionService {
+  private static readonly MAX_RECORDS = 5000;
+  private static readonly TTL_MS = 60 * 60 * 1000;
+
   private readonly inMemoryLedger: Map<string, TransactionRecord> = new Map();
   private readonly idempotencyIndex: Map<string, string> = new Map();
 
@@ -26,6 +29,8 @@ export class TransactionService {
     idempotencyKey?: string,
     createdBy?: string,
   ): TransactionRecord {
+    this.pruneExpiredRecords();
+
     const normalizedKey = idempotencyKey?.trim();
     const existing = this.getExistingByIdempotencyKey(normalizedKey);
     if (existing) {
@@ -50,6 +55,7 @@ export class TransactionService {
       this.idempotencyIndex.set(normalizedKey, record.id);
     }
 
+    this.evictOldestIfNeeded();
     return record;
   }
 
@@ -57,6 +63,7 @@ export class TransactionService {
     id: string,
     approveDto: ApproveTransactionDto = {},
   ): TransactionRecord | undefined {
+    this.pruneExpiredRecords();
     const record = this.requireRecord(id);
     const approverId = approveDto.approverId?.trim();
     const expectedVersion = approveDto.expectedVersion ?? record.version;
@@ -73,10 +80,12 @@ export class TransactionService {
   }
 
   findOne(id: string): TransactionRecord | undefined {
+    this.pruneExpiredRecords();
     return this.inMemoryLedger.get(id);
   }
 
   findByIdempotencyKey(idempotencyKey: string): TransactionRecord | undefined {
+    this.pruneExpiredRecords();
     const normalizedKey = idempotencyKey?.trim();
     if (!normalizedKey) {
       return undefined;
@@ -130,5 +139,49 @@ export class TransactionService {
         `Approval rejected: resource state changed. Expected version ${expectedVersion}, current version ${record.version}`,
       );
     }
+  }
+
+  private pruneExpiredRecords(): void {
+    const now = Date.now();
+
+    for (const [id, record] of this.inMemoryLedger.entries()) {
+      const lastTouched = new Date(record.updatedAt).getTime();
+      if (Number.isNaN(lastTouched)) {
+        this.deleteRecord(id);
+        continue;
+      }
+
+      if (now - lastTouched > TransactionService.TTL_MS) {
+        this.deleteRecord(id);
+      }
+    }
+  }
+
+  private evictOldestIfNeeded(): void {
+    if (this.inMemoryLedger.size <= TransactionService.MAX_RECORDS) {
+      return;
+    }
+
+    const oldestEntries = [...this.inMemoryLedger.entries()].sort(
+      ([, left], [, right]) =>
+        new Date(left.updatedAt).getTime() -
+        new Date(right.updatedAt).getTime(),
+    );
+
+    const excess = this.inMemoryLedger.size - TransactionService.MAX_RECORDS;
+    for (let i = 0; i < excess; i += 1) {
+      const [id] = oldestEntries[i];
+      if (id) {
+        this.deleteRecord(id);
+      }
+    }
+  }
+
+  private deleteRecord(id: string): void {
+    const record = this.inMemoryLedger.get(id);
+    if (record?.idempotencyKey) {
+      this.idempotencyIndex.delete(record.idempotencyKey);
+    }
+    this.inMemoryLedger.delete(id);
   }
 }
