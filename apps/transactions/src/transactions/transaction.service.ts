@@ -27,14 +27,9 @@ export class TransactionService {
     createdBy?: string,
   ): TransactionRecord {
     const normalizedKey = idempotencyKey?.trim();
-    if (normalizedKey) {
-      const existingId = this.idempotencyIndex.get(normalizedKey);
-      if (existingId) {
-        const existing = this.inMemoryLedger.get(existingId);
-        if (existing) {
-          return existing;
-        }
-      }
+    const existing = this.getExistingByIdempotencyKey(normalizedKey);
+    if (existing) {
+      return existing;
     }
 
     const now = new Date().toISOString();
@@ -44,15 +39,17 @@ export class TransactionService {
       createdAt: now,
       updatedAt: now,
       traceId,
-      idempotencyKey: normalizedKey,
+      idempotencyKey: normalizedKey || undefined,
       version: 1,
-      createdBy,
+      createdBy: createdBy?.trim() || undefined,
       payload: dto,
     };
+
     this.inMemoryLedger.set(record.id, record);
     if (normalizedKey) {
       this.idempotencyIndex.set(normalizedKey, record.id);
     }
+
     return record;
   }
 
@@ -60,26 +57,18 @@ export class TransactionService {
     id: string,
     approveDto: ApproveTransactionDto = {},
   ): TransactionRecord | undefined {
-    const record = this.inMemoryLedger.get(id);
-    if (!record) return undefined;
-
+    const record = this.requireRecord(id);
     const approverId = approveDto.approverId?.trim();
     const expectedVersion = approveDto.expectedVersion ?? record.version;
 
-    if (approverId && record.createdBy && approverId === record.createdBy) {
-      throw new Error('Self-approval is not allowed');
-    }
-
-    if (expectedVersion !== record.version) {
-      throw new Error(
-        `Approval rejected: resource state changed. Expected version ${expectedVersion}, current version ${record.version}`,
-      );
-    }
+    this.assertNotSelfApproval(record, approverId);
+    this.assertVersionMatches(record, expectedVersion);
 
     record.status = 'approved';
     record.approvedBy = approverId;
     record.version += 1;
     record.updatedAt = new Date().toISOString();
+
     return record;
   }
 
@@ -88,10 +77,58 @@ export class TransactionService {
   }
 
   findByIdempotencyKey(idempotencyKey: string): TransactionRecord | undefined {
-    const recordId = this.idempotencyIndex.get(idempotencyKey.trim());
+    const normalizedKey = idempotencyKey?.trim();
+    if (!normalizedKey) {
+      return undefined;
+    }
+
+    const recordId = this.idempotencyIndex.get(normalizedKey);
     if (!recordId) {
       return undefined;
     }
+
     return this.inMemoryLedger.get(recordId);
+  }
+
+  private getExistingByIdempotencyKey(
+    idempotencyKey?: string,
+  ): TransactionRecord | undefined {
+    if (!idempotencyKey) {
+      return undefined;
+    }
+
+    return this.findByIdempotencyKey(idempotencyKey);
+  }
+
+  private requireRecord(id: string): TransactionRecord {
+    const record = this.inMemoryLedger.get(id);
+    if (!record) {
+      throw new Error(`Transaction ${id} not found`);
+    }
+    return record;
+  }
+
+  private assertNotSelfApproval(
+    record: TransactionRecord,
+    approverId?: string,
+  ): void {
+    if (approverId && record.createdBy && approverId === record.createdBy) {
+      throw new Error('Self-approval is not allowed');
+    }
+  }
+
+  private assertVersionMatches(
+    record: TransactionRecord,
+    expectedVersion?: number,
+  ): void {
+    if (expectedVersion === undefined) {
+      return;
+    }
+
+    if (expectedVersion !== record.version) {
+      throw new Error(
+        `Approval rejected: resource state changed. Expected version ${expectedVersion}, current version ${record.version}`,
+      );
+    }
   }
 }
