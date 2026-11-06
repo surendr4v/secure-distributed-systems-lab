@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,7 +7,6 @@ import {
   Param,
   Post,
   Req,
-  BadRequestException,
 } from '@nestjs/common';
 import { Roles } from '../security/roles.decorator';
 import { ApproveTransactionDto, CreateTransactionDto } from './dto';
@@ -48,11 +48,6 @@ export class TransactionController {
     @Body() body: ApproveTransactionDto,
     @Req() req: any,
   ): TransactionRecord {
-    const record = this.service.findOne(id);
-    if (!record) {
-      throw new NotFoundException(`Transaction ${id} not found`);
-    }
-
     const approverId =
       body.approverId || req.user?.sub || req.servicePrincipal?.service;
 
@@ -68,6 +63,10 @@ export class TransactionController {
 
       return approved;
     } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+
       const message =
         error instanceof Error ? error.message : 'Approval failed';
       throw new BadRequestException(message);
