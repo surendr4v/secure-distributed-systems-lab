@@ -2,7 +2,7 @@
   "name": "secure-financial-microservices-poc",
   "version": "0.2.0",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "build": "run-p build:*",
     "build:auth": "nest build auth-service",

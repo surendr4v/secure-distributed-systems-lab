@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { DatabaseService } from '@shared/index';
 import { AppendAuditDto } from './dto';
 
-interface AuditRow {
+export interface AuditRow {
   id: string;
   prev_hash: string | null;
   entry_hash: string;
@@ -12,6 +12,11 @@ interface AuditRow {
   resource: string;
   payload: Record<string, unknown>;
   created_at: string;
+}
+
+export interface AuditVerificationResult {
+  valid: boolean;
+  invalidAt?: string;
 }
 
 @Injectable()
@@ -32,7 +37,15 @@ export class AuditService {
       `INSERT INTO audit_events (prev_hash, entry_hash, event_type, actor, resource, payload, created_at)
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
        RETURNING id`,
-      [prevHash, entryHash, input.eventType, input.actor, input.resource, JSON.stringify(input.payload ?? {}), createdAt],
+      [
+        prevHash,
+        entryHash,
+        input.eventType,
+        input.actor,
+        input.resource,
+        JSON.stringify(input.payload ?? {}),
+        createdAt,
+      ],
     );
 
     return { id: result.rows[0].id, hash: entryHash };
@@ -45,5 +58,38 @@ export class AuditService {
       [limit],
     );
     return result.rows;
+  }
+
+  verifyChain(
+    records: Array<{
+      id: string;
+      prev_hash: string | null;
+      entry_hash: string;
+      event_type: string;
+      actor: string;
+      resource: string;
+      payload: Record<string, unknown>;
+      created_at: string;
+    }>,
+  ): AuditVerificationResult {
+    let previousHash: string | null = null;
+    const ordered = [...records].sort(
+      (a, b) =>
+        new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+    );
+
+    for (const record of ordered) {
+      const body = `${record.prev_hash ?? ''}|${record.event_type}|${record.actor}|${record.resource}|${JSON.stringify(record.payload ?? {})}|${record.created_at}`;
+      const expectedHash = createHash('sha256').update(body).digest('hex');
+      if (record.entry_hash !== expectedHash) {
+        return { valid: false, invalidAt: record.id };
+      }
+      if (previousHash !== null && record.prev_hash !== previousHash) {
+        return { valid: false, invalidAt: record.id };
+      }
+      previousHash = record.entry_hash;
+    }
+
+    return { valid: true };
   }
 }

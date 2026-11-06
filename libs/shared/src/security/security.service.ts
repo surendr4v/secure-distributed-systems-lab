@@ -4,6 +4,8 @@ import * as jwt from 'jsonwebtoken';
 
 export interface AuthenticatedPrincipal {
   sub: string;
+  email?: string;
+  role?: string;
   roles: string[];
   scopes: string[];
   iss: string;
@@ -34,11 +36,24 @@ export class SecurityService {
         issuer: this.issuer,
         audience: this.audience,
       }) as AuthenticatedPrincipal;
-      decoded.roles = (decoded.roles as string[]) || [];
-      decoded.scopes = (decoded.scope as string)
-        ? (decoded.scope as string).split(' ')
-        : decoded.scopes || [];
-      return decoded;
+
+      const roles = Array.isArray(decoded.roles)
+        ? decoded.roles
+        : typeof decoded.role === 'string'
+          ? [decoded.role]
+          : [];
+
+      const scopes = Array.isArray(decoded.scopes)
+        ? decoded.scopes
+        : typeof decoded.scope === 'string'
+          ? decoded.scope.split(' ')
+          : [];
+
+      return {
+        ...decoded,
+        roles,
+        scopes,
+      };
     } catch (error) {
       throw new UnauthorizedException('Invalid or expired token');
     }

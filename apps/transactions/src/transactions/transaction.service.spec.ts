@@ -19,8 +19,47 @@ describe('TransactionService', () => {
   });
 
   it('approves an existing transaction', () => {
-    const record = service.submit(payload);
-    const approved = service.approve(record.id);
+    const record = service.submit(
+      payload,
+      undefined,
+      undefined,
+      'user-creator',
+    );
+    const approved = service.approve(record.id, {
+      approverId: 'user-approver',
+      expectedVersion: 1,
+    });
     expect(approved?.status).toBe('approved');
+    expect(approved?.approvedBy).toBe('user-approver');
+  });
+
+  it('rejects self-approval', () => {
+    const record = service.submit(
+      payload,
+      undefined,
+      undefined,
+      'user-creator',
+    );
+    expect(() =>
+      service.approve(record.id, {
+        approverId: 'user-creator',
+        expectedVersion: 1,
+      }),
+    ).toThrow('Self-approval is not allowed');
+  });
+
+  it('rejects stale approval attempts based on resource version', () => {
+    const record = service.submit(
+      payload,
+      undefined,
+      undefined,
+      'user-creator',
+    );
+    expect(() =>
+      service.approve(record.id, {
+        approverId: 'user-approver',
+        expectedVersion: 99,
+      }),
+    ).toThrow('Approval rejected: resource state changed');
   });
 });

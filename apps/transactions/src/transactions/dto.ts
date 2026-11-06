@@ -1,4 +1,13 @@
-import { IsISO4217CurrencyCode, IsNotEmpty, IsNumber, IsPositive, IsString, Length } from 'class-validator';
+import {
+  IsISO4217CurrencyCode,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Length,
+  Min,
+} from 'class-validator';
 
 export class CreateTransactionDto {
   @IsNotEmpty()
@@ -19,4 +28,15 @@ export class CreateTransactionDto {
   @Length(1, 140)
   @IsString()
   purpose!: string;
+}
+
+export class ApproveTransactionDto {
+  @IsOptional()
+  @IsString()
+  approverId?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  expectedVersion?: number;
 }
