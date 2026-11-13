@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { v4 as uuid } from 'uuid';
+import { OutboxService } from '../audit/outbox.service';
 import { ApproveTransactionDto, CreateTransactionDto } from './dto';
 
 export interface TransactionRecord {
@@ -22,6 +23,8 @@ export class TransactionService {
 
   private readonly inMemoryLedger: Map<string, TransactionRecord> = new Map();
   private readonly idempotencyIndex: Map<string, string> = new Map();
+
+  constructor(private readonly outbox: OutboxService) {}
 
   submit(
     dto: CreateTransactionDto,
@@ -55,6 +58,17 @@ export class TransactionService {
       this.idempotencyIndex.set(normalizedKey, record.id);
     }
 
+    this.outbox.enqueue({
+      eventType: 'TRANSACTION_CREATED',
+      actor: createdBy || 'system',
+      resource: `/transactions/${record.id}`,
+      payload: {
+        transactionId: record.id,
+        status: record.status,
+        amount: record.payload.amount,
+      },
+    });
+
     this.evictOldestIfNeeded();
     return record;
   }
@@ -75,6 +89,18 @@ export class TransactionService {
     record.approvedBy = approverId;
     record.version += 1;
     record.updatedAt = new Date().toISOString();
+
+    this.outbox.enqueue({
+      eventType: 'TRANSACTION_APPROVED',
+      actor: approverId || 'system',
+      resource: `/transactions/${record.id}`,
+      payload: {
+        transactionId: record.id,
+        status: record.status,
+        approvedBy: approverId,
+        version: record.version,
+      },
+    });
 
     return record;
   }
