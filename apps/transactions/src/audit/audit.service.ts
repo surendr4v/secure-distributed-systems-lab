@@ -18,10 +18,59 @@ export interface AuditRecord {
   meta?: Record<string, any>;
 }
 
+class CircuitBreaker {
+  private failureCount = 0;
+  private state: 'closed' | 'open' = 'closed';
+  private openedAt = 0;
+
+  constructor(
+    private readonly options = {
+      failureThreshold: 5,
+      cooldownMs: 30000,
+      minimumSamples: 5,
+    },
+  ) {}
+
+  allowRequest(): boolean {
+    if (this.state === 'open') {
+      if (Date.now() - this.openedAt >= this.options.cooldownMs) {
+        this.state = 'closed';
+        this.failureCount = 0;
+        return true;
+      }
+      return false;
+    }
+
+    return true;
+  }
+
+  recordSuccess(): void {
+    this.failureCount = 0;
+    this.state = 'closed';
+    this.openedAt = 0;
+  }
+
+  recordFailure(): void {
+    this.failureCount += 1;
+    if (
+      this.failureCount >= this.options.failureThreshold &&
+      this.state !== 'open'
+    ) {
+      this.state = 'open';
+      this.openedAt = Date.now();
+    }
+  }
+
+  getState(): 'closed' | 'open' {
+    return this.state;
+  }
+}
+
 @Injectable()
 export class AuditService {
   private readonly logger = new Logger('audit');
   private readonly logPath: string;
+  private readonly breaker = new CircuitBreaker();
 
   constructor(private readonly config: ConfigService) {
     this.logPath = this.config.get<string>('AUDIT_LOG_PATH', 'logs/audit.log');
@@ -33,6 +82,10 @@ export class AuditService {
     const entry = await this.buildEntry(record);
     await this.persist(entry);
     return entry;
+  }
+
+  getCircuitState(): 'closed' | 'open' {
+    return this.breaker.getState();
   }
 
   async verifyChain(): Promise<{ valid: boolean; invalidAt?: string }> {
@@ -122,14 +175,23 @@ export class AuditService {
   }
 
   private async persist(entry: AuditRecord) {
+    if (!this.breaker.allowRequest()) {
+      this.logger.warn(
+        `audit circuit open; skipping persistence for resource=${entry.resource}`,
+      );
+      return;
+    }
+
     try {
       await fs.mkdir(dirname(this.logPath), { recursive: true });
       const serialized = JSON.stringify(entry) + '\n';
       await fs.appendFile(this.logPath, serialized);
+      this.breaker.recordSuccess();
       this.logger.log(
         `audit ${entry.action} resource=${entry.resource} status=${entry.status} hash=${entry.entryHash}`,
       );
     } catch (error) {
+      this.breaker.recordFailure();
       this.logger.error('Failed to persist audit record', error as any);
     }
   }
