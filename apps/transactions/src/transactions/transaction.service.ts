@@ -1,4 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
+import { createHash } from 'crypto';
 import { v4 as uuid } from 'uuid';
 import { OutboxService } from '../audit/outbox.service';
 import { ApproveTransactionDto, CreateTransactionDto } from './dto';
@@ -16,15 +21,21 @@ export interface TransactionRecord {
   payload: CreateTransactionDto;
 }
 
+interface IdempotencyEntry {
+  recordId: string;
+  payloadHash: string;
+}
+
 @Injectable()
 export class TransactionService {
   private static readonly MAX_RECORDS = 5000;
   private static readonly TTL_MS = 60 * 60 * 1000;
+  private static readonly MAX_IDEMPOTENCY_KEY_LENGTH = 128;
 
   private readonly inMemoryLedger: Map<string, TransactionRecord> = new Map();
-  private readonly idempotencyIndex: Map<string, string> = new Map();
+  private readonly idempotencyIndex: Map<string, IdempotencyEntry> = new Map();
 
-  constructor(private readonly outbox: OutboxService) {}
+  constructor(private readonly outbox?: OutboxService) {}
 
   submit(
     dto: CreateTransactionDto,
@@ -34,9 +45,18 @@ export class TransactionService {
   ): TransactionRecord {
     this.pruneExpiredRecords();
 
-    const normalizedKey = idempotencyKey?.trim();
+    const normalizedKey = this.normalizeIdempotencyKey(idempotencyKey);
+    const payloadHash = this.hashPayload(dto);
     const existing = this.getExistingByIdempotencyKey(normalizedKey);
     if (existing) {
+      const entry = normalizedKey
+        ? this.idempotencyIndex.get(normalizedKey)
+        : undefined;
+      if (entry?.payloadHash !== payloadHash) {
+        throw new ConflictException(
+          'Idempotency key has already been used with a different request',
+        );
+      }
       return existing;
     }
 
@@ -55,10 +75,13 @@ export class TransactionService {
 
     this.inMemoryLedger.set(record.id, record);
     if (normalizedKey) {
-      this.idempotencyIndex.set(normalizedKey, record.id);
+      this.idempotencyIndex.set(normalizedKey, {
+        recordId: record.id,
+        payloadHash,
+      });
     }
 
-    this.outbox.enqueue({
+    this.outbox?.enqueue({
       eventType: 'TRANSACTION_CREATED',
       actor: createdBy || 'system',
       resource: `/transactions/${record.id}`,
@@ -90,7 +113,7 @@ export class TransactionService {
     record.version += 1;
     record.updatedAt = new Date().toISOString();
 
-    this.outbox.enqueue({
+    this.outbox?.enqueue({
       eventType: 'TRANSACTION_APPROVED',
       actor: approverId || 'system',
       resource: `/transactions/${record.id}`,
@@ -112,17 +135,44 @@ export class TransactionService {
 
   findByIdempotencyKey(idempotencyKey: string): TransactionRecord | undefined {
     this.pruneExpiredRecords();
-    const normalizedKey = idempotencyKey?.trim();
+    const normalizedKey = this.normalizeIdempotencyKey(idempotencyKey);
     if (!normalizedKey) {
       return undefined;
     }
 
-    const recordId = this.idempotencyIndex.get(normalizedKey);
-    if (!recordId) {
+    const entry = this.idempotencyIndex.get(normalizedKey);
+    if (!entry) {
       return undefined;
     }
 
-    return this.inMemoryLedger.get(recordId);
+    return this.inMemoryLedger.get(entry.recordId);
+  }
+
+  private normalizeIdempotencyKey(idempotencyKey?: string): string | undefined {
+    const normalized = idempotencyKey?.trim();
+    if (!normalized) {
+      return undefined;
+    }
+    if (normalized.length > TransactionService.MAX_IDEMPOTENCY_KEY_LENGTH) {
+      throw new BadRequestException('Idempotency key exceeds 128 characters');
+    }
+    if (!/^[-A-Za-z0-9._:]+$/.test(normalized)) {
+      throw new BadRequestException(
+        'Idempotency key may contain only letters, numbers, dots, hyphens, underscores, and colons',
+      );
+    }
+    return normalized;
+  }
+
+  private hashPayload(dto: CreateTransactionDto): string {
+    const canonical = {
+      fromAccount: dto.fromAccount,
+      toAccount: dto.toAccount,
+      amount: dto.amount,
+      currency: dto.currency,
+      purpose: dto.purpose,
+    };
+    return createHash('sha256').update(JSON.stringify(canonical)).digest('hex');
   }
 
   private getExistingByIdempotencyKey(
