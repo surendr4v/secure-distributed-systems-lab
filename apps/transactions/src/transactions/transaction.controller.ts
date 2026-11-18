@@ -25,16 +25,15 @@ export class TransactionController {
     const traceId =
       (req.headers['x-trace-id'] as string) ||
       (req.headers['x-request-id'] as string);
-    const idempotencyKey =
-      (req.headers['x-idempotency-key'] as string) ||
-      (req.headers['idempotency-key'] as string);
 
-    const existing = idempotencyKey
-      ? this.service.findByIdempotencyKey(idempotencyKey)
-      : undefined;
-    if (existing) {
-      return existing;
+    const rawKey =
+      req.headers['x-idempotency-key'] || req.headers['idempotency-key'];
+    if (Array.isArray(rawKey)) {
+      throw new BadRequestException(
+        'Only one Idempotency-Key header is allowed',
+      );
     }
+    const idempotencyKey = typeof rawKey === 'string' ? rawKey : undefined;
 
     const actor =
       req.user?.sub || req.user?.email || req.servicePrincipal?.service;
