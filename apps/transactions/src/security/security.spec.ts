@@ -114,12 +114,13 @@ describe('ZeroTrustGuard', () => {
     expect(request.user.sub).toBe('user-1');
   });
 
-  it('uses the first bearer value when authorization is an array', () => {
+  it('rejects array-valued Authorization headers', () => {
     reflector.getAllAndOverride.mockReturnValue(false);
-    security.verifyJwt.mockReturnValue({ sub: 'user-1' });
     const request: any = { headers: { authorization: ['Bearer token-1'] } };
 
-    expect(guard.canActivate(contextFor(request))).toBe(true);
+    expect(() => guard.canActivate(contextFor(request))).toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('authenticates mesh service credentials', () => {

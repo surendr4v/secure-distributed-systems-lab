@@ -25,11 +25,18 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    if (!user?.roles || user.roles.length === 0) {
+    if (!Array.isArray(user?.roles) || user.roles.length === 0) {
       throw new ForbiddenException('Missing roles');
     }
 
-    const hasRole = requiredRoles.some((role) => user.roles.includes(role));
+    const validRoles = user.roles.filter(
+      (role: unknown) => typeof role === 'string',
+    );
+    if (validRoles.length === 0) {
+      throw new ForbiddenException('Missing roles');
+    }
+
+    const hasRole = requiredRoles.some((role) => validRoles.includes(role));
     if (!hasRole) {
       throw new ForbiddenException('Insufficient role');
     }

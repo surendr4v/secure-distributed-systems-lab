@@ -8,7 +8,9 @@ import * as Joi from 'joi';
       isGlobal: true,
       cache: true,
       validationSchema: Joi.object({
-        NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
+        NODE_ENV: Joi.string()
+          .valid('development', 'production', 'test')
+          .default('development'),
         PORT: Joi.number().port().default(3000),
         SERVICE_ID: Joi.string().default('transactions-service'),
         JWT_ISSUER: Joi.string().required(),
@@ -20,6 +22,7 @@ import * as Joi from 'joi';
         THROTTLE_LIMIT: Joi.number().positive().default(100),
         TLS_CERT_PATH: Joi.string().optional(),
         TLS_KEY_PATH: Joi.string().optional(),
+        CORS_ALLOWED_ORIGINS: Joi.string().allow('').default(''),
       }),
     }),
   ],
