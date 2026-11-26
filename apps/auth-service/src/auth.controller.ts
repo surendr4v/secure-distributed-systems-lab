@@ -1,4 +1,11 @@
-import { Body, Controller, Get, Post, Req, UnauthorizedException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthVerifierService, InternalOnly, Public } from '@shared/index';
 import { Request } from 'express';
 import { LoginDto } from './dto';
@@ -6,11 +13,16 @@ import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService, private readonly verifier: AuthVerifierService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly verifier: AuthVerifierService,
+  ) {}
 
   @Public()
   @Post('login')
-  async login(@Body() dto: LoginDto): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
+  async login(
+    @Body() dto: LoginDto,
+  ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
     return this.authService.login(dto.email, dto.password);
   }
 
@@ -18,11 +30,16 @@ export class AuthController {
   @Post('validate')
   validate(@Req() req: Request): { valid: true; principal: unknown } {
     const auth = req.headers.authorization;
-    if (typeof auth !== 'string' || !auth.startsWith('Bearer ')) {
+    if (typeof auth !== 'string') {
       throw new UnauthorizedException('Missing bearer token');
     }
 
-    const principal = this.verifier.verifyUserToken(auth.slice('Bearer '.length));
+    const match = /^Bearer ([^\s]+)$/i.exec(auth.trim());
+    if (!match) {
+      throw new UnauthorizedException('Missing bearer token');
+    }
+
+    const principal = this.verifier.verifyUserToken(match[1]);
     return { valid: true, principal };
   }
 

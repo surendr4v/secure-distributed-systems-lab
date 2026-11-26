@@ -12,16 +12,29 @@ export class AuthService {
   private readonly privateKey: string;
   private readonly expiresIn: string;
 
-  constructor(private readonly users: UserRepository, config: ConfigService) {
+  constructor(
+    private readonly users: UserRepository,
+    config: ConfigService,
+  ) {
     this.issuer = config.getOrThrow<string>('JWT_ISSUER');
     this.audience = config.getOrThrow<string>('JWT_AUDIENCE');
-    this.privateKey = config.getOrThrow<string>('JWT_PRIVATE_KEY').replace(/\\n/g, '\n');
+    this.privateKey = config
+      .getOrThrow<string>('JWT_PRIVATE_KEY')
+      .replace(/\\n/g, '\n');
     this.expiresIn = config.get<string>('JWT_EXPIRES_IN', '15m');
   }
 
-  async login(email: string, password: string): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
-    const user = await this.users.findByEmail(email);
+  async login(
+    email: string,
+    password: string,
+  ): Promise<{ accessToken: string; tokenType: 'Bearer'; expiresIn: string }> {
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.users.findByEmail(normalizedEmail);
+    const dummyHash =
+      '$2a$12$C9rQzRzQ1bPpB5eWnH9QCePzFqXwGmWzQ5YkM9oZ7Lk6VxGmXy3C.';
+
     if (!user || !user.is_active) {
+      await bcrypt.compare(password, dummyHash);
       throw new UnauthorizedException('Invalid credentials');
     }
 
@@ -41,7 +54,8 @@ export class AuthService {
       {
         sub: user.id,
         email: user.email,
-        role: user.role,
+        roles: [user.role],
+        scopes: [],
       },
       this.privateKey,
       signOptions,

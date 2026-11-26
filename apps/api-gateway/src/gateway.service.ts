@@ -8,8 +8,14 @@ export class GatewayService {
   private readonly sharedSecret: string;
 
   constructor(config: ConfigService) {
-    this.authUrl = config.get<string>('AUTH_SERVICE_URL', 'http://auth-service:3001');
-    this.txUrl = config.get<string>('TRANSACTION_SERVICE_URL', 'http://transaction-service:3002');
+    this.authUrl = config.get<string>(
+      'AUTH_SERVICE_URL',
+      'http://auth-service:3001',
+    );
+    this.txUrl = config.get<string>(
+      'TRANSACTION_SERVICE_URL',
+      'http://transaction-service:3002',
+    );
     this.sharedSecret = config.getOrThrow<string>('INTERNAL_SHARED_SECRET');
   }
 
@@ -18,10 +24,17 @@ export class GatewayService {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10_000),
     });
   }
 
-  forwardToTransactions(path: string, method: string, bearer: string | undefined, body?: unknown, idempotencyKey?: string): Promise<Response> {
+  forwardToTransactions(
+    path: string,
+    method: string,
+    bearer: string | undefined,
+    body?: unknown,
+    idempotencyKey?: string,
+  ): Promise<Response> {
     const headers: Record<string, string> = {
       'x-service-name': 'api-gateway',
       'x-service-secret': this.sharedSecret,
@@ -40,6 +53,7 @@ export class GatewayService {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(10_000),
     });
   }
 }

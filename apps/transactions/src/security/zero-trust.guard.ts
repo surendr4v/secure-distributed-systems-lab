@@ -25,22 +25,35 @@ export class ZeroTrustGuard implements CanActivate {
     if (isPublic) return true;
 
     const authHeader = request.headers['authorization'];
-    const bearerToken = Array.isArray(authHeader)
-      ? authHeader[0]
-      : authHeader;
+    if (Array.isArray(authHeader)) {
+      throw new UnauthorizedException(
+        'Multiple Authorization headers are not allowed',
+      );
+    }
 
-    if (bearerToken?.startsWith('Bearer ')) {
-      const token = bearerToken.replace('Bearer ', '').trim();
-      const principal = this.security.verifyJwt(token);
+    const bearerMatch =
+      typeof authHeader === 'string'
+        ? /^Bearer ([^\s]+)$/i.exec(authHeader.trim())
+        : null;
+
+    if (bearerMatch) {
+      const principal = this.security.verifyJwt(bearerMatch[1]);
       (request as any).user = principal;
       return true;
     }
 
-    const serviceToken = request.headers['x-service-secret'] as string;
-    if (this.security.validateServiceToken(serviceToken)) {
-      (request as any).servicePrincipal = {
-        service: request.headers['x-service-name'] || 'unknown',
-      };
+    const serviceToken = request.headers['x-service-secret'];
+    if (
+      typeof serviceToken === 'string' &&
+      this.security.validateServiceToken(serviceToken)
+    ) {
+      const rawServiceName = request.headers['x-service-name'];
+      const serviceName =
+        typeof rawServiceName === 'string' &&
+        /^[A-Za-z0-9._-]{1,128}$/.test(rawServiceName)
+          ? rawServiceName
+          : 'unknown';
+      (request as any).servicePrincipal = { service: serviceName };
       return true;
     }
 
